@@ -42,7 +42,7 @@ pub enum Message {
     Nat(usize),
     Int(isize),
     Str(&'static str),
-    Cust(Rc<Actor>),
+    Addr(Rc<Actor>),
     OkFail {
         ok: Rc<Actor>,
         fail: Rc<Actor>,
@@ -170,9 +170,9 @@ mod tests {
         fn react(&self, event: Event) -> Effect {
             let mut effect = Effect::new();
             match event.message {
-                Message::Cust(cust) => {
+                Message::Addr(cust) => {
                     let actor = effect.create(Box::new(Sink {}));
-                    effect.send(&cust, Message::Cust(Rc::clone(&actor)));
+                    effect.send(&cust, Message::Addr(Rc::clone(&actor)));
                 },
                 _ => effect.throw("unknown message"),
             }
@@ -193,7 +193,7 @@ mod tests {
         assert_ne!(None, effect.error());
 
         let sink = Actor::new(Box::new(Sink {}));
-        let event = Event::new(&maker, Message::Cust(Rc::clone(&sink)));
+        let event = Event::new(&maker, Message::Addr(Rc::clone(&sink)));
         let effect = maker.dispatch(event);
 
         assert_eq!(1, effect.actor_count());
