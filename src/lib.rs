@@ -15,6 +15,7 @@ impl Actor {
             behavior: RefCell::new(behavior),
         })
     }
+
     pub fn dispatch(&self, event: Event) -> Effect {
         self.behavior.borrow().react(event)
     }
@@ -41,6 +42,21 @@ pub enum Message {
     Nat(usize),
     Int(isize),
     Str(&'static str),
+    Cust(Rc<Actor>),
+    OkFail {
+        ok: Rc<Actor>,
+        fail: Rc<Actor>,
+    },
+    List(Vec<Message>),
+    GetMsg {
+        cust: Rc<Actor>,
+        name: &'static str,
+    },
+    SetMsg {
+        cust: Rc<Actor>,
+        name: &'static str,
+        value: Box<Message>,
+    },
 }
 
 pub struct Effect {
@@ -58,6 +74,7 @@ impl Effect {
             error: None,
         }
     }
+
     pub fn create(&mut self, behavior: Box<dyn Behavior>) -> Rc<Actor> {
         let actor = Actor::new(behavior);
         self.actors.push(Rc::clone(&actor));
@@ -70,6 +87,10 @@ impl Effect {
     pub fn update(&mut self, behavior: Box<dyn Behavior>) {
         self.state = Some(behavior);
     }
+    pub fn throw(&mut self, reason: &'static str) {
+        self.error = Some(reason);
+    }
+
     pub fn actor_count(&self) -> usize {
         self.actors.len()
     }
@@ -143,9 +164,67 @@ mod tests {
         assert_eq!(0, effect.event_count());
         assert_eq!(None, effect.error());
     }
+
+    struct Maker {}
+    impl Behavior for Maker {
+        fn react(&self, event: Event) -> Effect {
+            let mut effect = Effect::new();
+            match event.message {
+                Message::Cust(cust) => {
+                    let actor = effect.create(Box::new(Sink {}));
+                    effect.send(&cust, Message::Cust(Rc::clone(&actor)));
+                },
+                _ => effect.throw("unknown message"),
+            }
+            effect
+        }
+    }
+
+    #[test]
+    fn maker_behavior() {
+        let maker = Actor::new(Box::new(Maker {}));
+
+        let event = Event::new(&maker, Message::Empty);
+        let effect = maker.dispatch(event);
+
+        assert_eq!(0, effect.actor_count());
+        assert_eq!(0, effect.event_count());
+        println!("Got error = {:?}", effect.error());
+        assert_ne!(None, effect.error());
+
+        let sink = Actor::new(Box::new(Sink {}));
+        let event = Event::new(&maker, Message::Cust(Rc::clone(&sink)));
+        let effect = maker.dispatch(event);
+
+        assert_eq!(1, effect.actor_count());
+        assert_eq!(1, effect.event_count());
+        assert_eq!(None, effect.error());
+    }
 }
 
 /*
+CREATE undefined WITH \(cust, _).[ SEND ? TO cust ]
+LET empty_env_beh = \(cust, req).[
+  SEND ? TO cust
+  SEND #undefined, req TO warning
+]
+LET env_beh(ident, value, next) = \(cust, req).[
+  CASE req OF
+  (#lookup, $ident) : [ SEND value TO cust ]
+  _ : [ SEND (cust, req) TO next ]
+  END
+]
+LET mutable_env_beh(next) = \(cust, req).[
+  CASE req OF
+  (#bind, ident, value) : [
+    CREATE next' WITH env_beh(ident, value, next)
+    BECOME mutable_env_beh(next')
+    SEND SELF TO cust
+  ]
+  _ : [ SEND (cust, req) TO next ]
+  END
+]
+
 LET race_beh(list) = \(cust, req).[
     CREATE once WITH once_beh(cust)
     send_to_all((once, req), list)
