@@ -1,11 +1,10 @@
 use reactor::*;
-use std::rc::Rc;
 use std::cell::RefCell;
 
 struct CallCounter {
     count: RefCell<usize>,
 }
-impl ReActor for CallCounter {
+impl Behavior for CallCounter {
     fn react(&self, _event: Event) -> Effect {
         *self.count.borrow_mut() += 1;
         Effect::new()

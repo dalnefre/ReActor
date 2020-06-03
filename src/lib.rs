@@ -1,15 +1,15 @@
 use std::collections::VecDeque;
 use std::rc::Rc;
 
-pub trait ReActor {  // FIXME: rename this to Behavior
+pub trait Behavior {
     fn react(&self, event: Event) -> Effect;
 }
 
 pub struct Actor {
-    behavior: Box<dyn ReActor>,
+    behavior: Box<dyn Behavior>,
 }
 impl Actor {
-    pub fn new(behavior: Box<dyn ReActor>) -> Rc<Actor> {
+    pub fn new(behavior: Box<dyn Behavior>) -> Rc<Actor> {
         Rc::new(Actor { behavior })
     }
     pub fn dispatch(&self, event: Event) -> Effect {
@@ -73,7 +73,7 @@ mod tests {
     use super::*;
 
     struct Sink {}
-    impl ReActor for Sink {
+    impl Behavior for Sink {
         fn react(&self, _event: Event) -> Effect {
             Effect::new()
         }
@@ -93,7 +93,7 @@ mod tests {
     struct Once {
         cust: Rc<Actor>,
     }
-    impl ReActor for Once {
+    impl Behavior for Once {
         fn react(&self, event: Event) -> Effect {
             let mut effect = Effect::new();
             effect.send(&self.cust, event.message);
