@@ -58,6 +58,11 @@ impl Effect {
             error: None,
         }
     }
+    pub fn create(&mut self, behavior: Box<dyn Behavior>) -> Rc<Actor> {
+        let actor = Actor::new(behavior);
+        self.actors.push(Rc::clone(&actor));
+        actor
+    }
     pub fn send(&mut self, target: &Rc<Actor>, message: Message) {
         let event = Event::new(target, message);
         self.events.push_back(event);
@@ -127,6 +132,8 @@ mod tests {
 
         if let Some(behavior) = effect.state {
             once.update(behavior);
+        } else {
+            panic!("expected new state!");
         }
 
         let event = Event::new(&once, Message::Empty);
@@ -137,3 +144,39 @@ mod tests {
         assert_eq!(None, effect.error());
     }
 }
+
+/*
+LET race_beh(list) = \(cust, req).[
+    CREATE once WITH once_beh(cust)
+    send_to_all((once, req), list)
+]
+LET send_to_all(msg, list) = [
+    CASE list OF
+    () : []
+    (first, rest) : [
+        SEND msg TO first
+        send_to_all(msg, rest)
+    ]
+    (last) : [ SEND msg TO last ]
+    END
+]
+
+LET tag_beh(cust) = \msg.[ SEND (SELF, msg) TO cust ]
+LET join_beh(cust, k_first, k_rest) = \msg.[
+  CASE msg OF
+  ($k_first, first) : [
+    BECOME \($k_rest, rest).[ SEND (first, rest) TO cust ]
+  ]
+  ($k_rest, rest) : [
+    BECOME \($k_first, first).[ SEND (first, rest) TO cust ]
+  ]
+  END
+]
+LET fork_beh(cust, head, tail) = \(h_req, t_req).[
+  CREATE k_head WITH tag_beh(SELF)
+  CREATE k_tail WITH tag_beh(SELF)
+  SEND (k_head, h_req) TO head
+  SEND (k_tail, t_req) TO tail
+  BECOME join_beh(cust, k_head, k_tail)
+]
+*/
