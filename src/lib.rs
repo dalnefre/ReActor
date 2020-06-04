@@ -37,12 +37,15 @@ impl Event {
     }
 }
 
+type Error = &'static str;
+
 pub enum Message {
     Empty,
     Nat(usize),
     Int(isize),
     Str(&'static str),
     Addr(Rc<Actor>),
+    Maybe(Option<Box<Message>>),
     OkFail {
         ok: Rc<Actor>,
         fail: Rc<Actor>,
@@ -63,7 +66,7 @@ pub struct Effect {
     actors: Vec<Rc<Actor>>,
     events: VecDeque<Event>,
     state: Option<Box<dyn Behavior>>,
-    error: Option<&'static str>,
+    error: Option<Error>,
 }
 impl Effect {
     pub fn new() -> Effect {
@@ -87,15 +90,8 @@ impl Effect {
     pub fn update(&mut self, behavior: Box<dyn Behavior>) {
         self.state = Some(behavior);
     }
-    pub fn throw(&mut self, reason: &'static str) {
+    pub fn throw(&mut self, reason: Error) {
         self.error = Some(reason);
-    }
-
-    fn actor_count(&self) -> usize {
-        self.actors.len()
-    }
-    fn event_count(&self) -> usize {
-        self.events.len()
     }
 }
 
@@ -169,8 +165,8 @@ mod tests {
         let event = Event::new(&sink, Message::Empty);
         let effect = sink.dispatch(event);
 
-        assert_eq!(0, effect.actor_count());
-        assert_eq!(0, effect.event_count());
+        assert_eq!(0, effect.actors.len());
+        assert_eq!(0, effect.events.len());
         assert_eq!(None, effect.error);
     }
 
@@ -196,8 +192,8 @@ mod tests {
         let event = Event::new(&once, Message::Empty);
         let effect = once.dispatch(event);
 
-        assert_eq!(0, effect.actor_count());
-        assert_eq!(1, effect.event_count());
+        assert_eq!(0, effect.actors.len());
+        assert_eq!(1, effect.events.len());
         assert_eq!(None, effect.error);
 
         if let Some(behavior) = effect.state {
@@ -209,8 +205,8 @@ mod tests {
         let event = Event::new(&once, Message::Empty);
         let effect = once.dispatch(event);
 
-        assert_eq!(0, effect.actor_count());
-        assert_eq!(0, effect.event_count());
+        assert_eq!(0, effect.actors.len());
+        assert_eq!(0, effect.events.len());
         assert_eq!(None, effect.error);
     }
 
@@ -236,8 +232,8 @@ mod tests {
         let event = Event::new(&maker, Message::Empty);
         let effect = maker.dispatch(event);
 
-        assert_eq!(0, effect.actor_count());
-        assert_eq!(0, effect.event_count());
+        assert_eq!(0, effect.actors.len());
+        assert_eq!(0, effect.events.len());
         println!("Got error = {:?}", effect.error);
         assert_ne!(None, effect.error);
 
@@ -245,66 +241,8 @@ mod tests {
         let event = Event::new(&maker, Message::Addr(Rc::clone(&sink)));
         let effect = maker.dispatch(event);
 
-        assert_eq!(1, effect.actor_count());
-        assert_eq!(1, effect.event_count());
+        assert_eq!(1, effect.actors.len());
+        assert_eq!(1, effect.events.len());
         assert_eq!(None, effect.error);
     }
 }
-
-/*
-CREATE undefined WITH \(cust, _).[ SEND ? TO cust ]
-LET empty_env_beh = \(cust, req).[
-  SEND ? TO cust
-  SEND #undefined, req TO warning
-]
-LET env_beh(ident, value, next) = \(cust, req).[
-  CASE req OF
-  (#lookup, $ident) : [ SEND value TO cust ]
-  _ : [ SEND (cust, req) TO next ]
-  END
-]
-LET mutable_env_beh(next) = \(cust, req).[
-  CASE req OF
-  (#bind, ident, value) : [
-    CREATE next' WITH env_beh(ident, value, next)
-    BECOME mutable_env_beh(next')
-    SEND SELF TO cust
-  ]
-  _ : [ SEND (cust, req) TO next ]
-  END
-]
-
-LET race_beh(list) = \(cust, req).[
-    CREATE once WITH once_beh(cust)
-    send_to_all((once, req), list)
-]
-LET send_to_all(msg, list) = [
-    CASE list OF
-    () : []
-    (first, rest) : [
-        SEND msg TO first
-        send_to_all(msg, rest)
-    ]
-    (last) : [ SEND msg TO last ]
-    END
-]
-
-LET tag_beh(cust) = \msg.[ SEND (SELF, msg) TO cust ]
-LET join_beh(cust, k_first, k_rest) = \msg.[
-  CASE msg OF
-  ($k_first, first) : [
-    BECOME \($k_rest, rest).[ SEND (first, rest) TO cust ]
-  ]
-  ($k_rest, rest) : [
-    BECOME \($k_first, first).[ SEND (first, rest) TO cust ]
-  ]
-  END
-]
-LET fork_beh(cust, head, tail) = \(h_req, t_req).[
-  CREATE k_head WITH tag_beh(SELF)
-  CREATE k_tail WITH tag_beh(SELF)
-  SEND (k_head, h_req) TO head
-  SEND (k_tail, t_req) TO tail
-  BECOME join_beh(cust, k_head, k_tail)
-]
-*/
