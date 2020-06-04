@@ -10,16 +10,16 @@ pub struct Actor {
     behavior: RefCell<Box<dyn Behavior>>,
 }
 impl Actor {
-    pub fn new(behavior: Box<dyn Behavior>) -> Rc<Actor> {
+    fn new(behavior: Box<dyn Behavior>) -> Rc<Actor> {
         Rc::new(Actor {
             behavior: RefCell::new(behavior),
         })
     }
 
-    pub fn dispatch(&self, event: Event) -> Effect {
+    fn dispatch(&self, event: Event) -> Effect {
         self.behavior.borrow().react(event)
     }
-    pub fn update(&self, behavior: Box<dyn Behavior>) {
+    fn update(&self, behavior: Box<dyn Behavior>) {
         *self.behavior.borrow_mut() = behavior;
     }
 }
@@ -29,7 +29,7 @@ pub struct Event {
     message: Message,
 }
 impl Event {
-    pub fn new(target: &Rc<Actor>, message: Message) -> Event {
+    fn new(target: &Rc<Actor>, message: Message) -> Event {
         Event {
             target: Rc::clone(target),
             message: message
@@ -91,14 +91,63 @@ impl Effect {
         self.error = Some(reason);
     }
 
-    pub fn actor_count(&self) -> usize {
+    fn actor_count(&self) -> usize {
         self.actors.len()
     }
-    pub fn event_count(&self) -> usize {
+    fn event_count(&self) -> usize {
         self.events.len()
     }
-    pub fn error(&self) -> Option<&'static str> {
-        self.error
+}
+
+pub struct Config {
+    actors: Vec<Rc<Actor>>,
+    events: VecDeque<Event>,
+}
+impl Config {
+    pub fn new() -> Config {
+        Config {
+            actors: Vec::new(),
+            events: VecDeque::new(),
+        }
+    }
+
+    /// Execute bootstrap `behavior` to initialize Config.
+    ///
+    /// Returns the number of events enqueued.
+    pub fn boot(&mut self, behavior: Box<dyn Behavior>) -> usize {
+        let actor = Actor::new(behavior);
+        self.actors.push(Rc::clone(&actor));  // FIXME: do we need to retain the bootstrap actor?
+        let event = Event::new(&actor, Message::Empty);
+        self.events.push_back(event);
+        self.dispatch(1)  // dispatch bootstrap message
+    }
+
+    /// Dispatch up to `limit` events.
+    ///
+    /// Returns the number of events still waiting in queue.
+    pub fn dispatch(&mut self, mut limit: usize) -> usize {
+        while limit > 0 {
+            if let Some(event) = self.events.pop_front() {
+                let target = Rc::clone(&event.target);
+                let mut effect = target.dispatch(event);
+                match effect.error {
+                    None => {
+                        if let Some(behavior) = effect.state.take() {
+                            target.update(behavior);
+                        }
+                        self.actors.append(&mut effect.actors);  // FIXME: should convert to Weak references here...
+                        self.events.append(&mut effect.events);
+                    },
+                    Some(reason) => {
+                        println!("FAIL! {}", reason);  // FIXME: should deliver a signal to meta-controller
+                    },
+                }
+            } else {
+                break;
+            }
+            limit -= 1;
+        }
+        self.events.len()  // remaining event count
     }
 }
 
@@ -122,7 +171,7 @@ mod tests {
 
         assert_eq!(0, effect.actor_count());
         assert_eq!(0, effect.event_count());
-        assert_eq!(None, effect.error());
+        assert_eq!(None, effect.error);
     }
 
     struct Once {
@@ -149,7 +198,7 @@ mod tests {
 
         assert_eq!(0, effect.actor_count());
         assert_eq!(1, effect.event_count());
-        assert_eq!(None, effect.error());
+        assert_eq!(None, effect.error);
 
         if let Some(behavior) = effect.state {
             once.update(behavior);
@@ -162,7 +211,7 @@ mod tests {
 
         assert_eq!(0, effect.actor_count());
         assert_eq!(0, effect.event_count());
-        assert_eq!(None, effect.error());
+        assert_eq!(None, effect.error);
     }
 
     struct Maker;
@@ -189,8 +238,8 @@ mod tests {
 
         assert_eq!(0, effect.actor_count());
         assert_eq!(0, effect.event_count());
-        println!("Got error = {:?}", effect.error());
-        assert_ne!(None, effect.error());
+        println!("Got error = {:?}", effect.error);
+        assert_ne!(None, effect.error);
 
         let sink = Actor::new(Box::new(Sink {}));
         let event = Event::new(&maker, Message::Addr(Rc::clone(&sink)));
@@ -198,7 +247,7 @@ mod tests {
 
         assert_eq!(1, effect.actor_count());
         assert_eq!(1, effect.event_count());
-        assert_eq!(None, effect.error());
+        assert_eq!(None, effect.error);
     }
 }
 
