@@ -106,7 +106,7 @@ impl Effect {
 mod tests {
     use super::*;
 
-    struct Sink {}
+    struct Sink;
     impl Behavior for Sink {
         fn react(&self, _event: Event) -> Effect {
             Effect::new()
@@ -165,7 +165,7 @@ mod tests {
         assert_eq!(None, effect.error());
     }
 
-    struct Maker {}
+    struct Maker;
     impl Behavior for Maker {
         fn react(&self, event: Event) -> Effect {
             let mut effect = Effect::new();
