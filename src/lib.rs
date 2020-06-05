@@ -39,8 +39,8 @@ pub struct Event {
     message: Message,
 }
 impl Event {
-    fn new(target: &Rc<Actor>, message: Message) -> Event {
-        Event {
+    fn new(target: &Rc<Actor>, message: Message) -> Self {
+        Self {
             target: Rc::clone(target),
             message: message
         }
@@ -80,8 +80,8 @@ pub struct Effect {
     error: Option<Error>,
 }
 impl Effect {
-    pub fn new() -> Effect {
-        Effect {
+    pub fn new() -> Self {
+        Self {
             actors: Vec::new(),
             events: VecDeque::new(),
             state: None,
@@ -111,8 +111,8 @@ pub struct Config {
     events: VecDeque<Event>,
 }
 impl Config {
-    pub fn new() -> Config {
-        Config {
+    pub fn new() -> Self {
+        Self {
             actors: Vec::new(),
             events: VecDeque::new(),
         }
