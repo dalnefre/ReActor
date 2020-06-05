@@ -1,3 +1,8 @@
+//! # ReActor
+//!
+//! An [Actor](https://en.wikipedia.org/wiki/Actor_model) runtime for Rust.
+//!
+
 use std::collections::VecDeque;
 use std::rc::Rc;
 use std::cell::RefCell;
@@ -46,11 +51,12 @@ pub enum Message {
     Str(&'static str),
     Addr(Rc<Actor>),
     Maybe(Option<Box<Message>>),
+    Pair(Box<Message>, Box<Message>),
+    List(&'static [Box<Message>]),
     OkFail {
         ok: Rc<Actor>,
         fail: Rc<Actor>,
     },
-    List(Vec<Message>),
     GetMsg {
         cust: Rc<Actor>,
         name: &'static str,
@@ -160,7 +166,7 @@ mod tests {
 
     #[test]
     fn sink_behavior() {
-        let sink = Actor::new(Box::new(Sink {}));
+        let sink = Actor::new(Box::new(Sink));
 
         let event = Event::new(&sink, Message::Empty);
         let effect = sink.dispatch(event);
@@ -184,7 +190,7 @@ mod tests {
 
     #[test]
     fn once_behavior() {
-        let sink = Actor::new(Box::new(Sink {}));
+        let sink = Actor::new(Box::new(Sink));
         let once = Actor::new(Box::new(Once {
             cust: Rc::clone(&sink)
         }));
@@ -216,7 +222,7 @@ mod tests {
             let mut effect = Effect::new();
             match event.message {
                 Message::Addr(cust) => {
-                    let actor = effect.create(Box::new(Sink {}));
+                    let actor = effect.create(Box::new(Sink));
                     effect.send(&cust, Message::Addr(Rc::clone(&actor)));
                 },
                 _ => effect.throw("unknown message"),
@@ -227,7 +233,7 @@ mod tests {
 
     #[test]
     fn maker_behavior() {
-        let maker = Actor::new(Box::new(Maker {}));
+        let maker = Actor::new(Box::new(Maker));
 
         let event = Event::new(&maker, Message::Empty);
         let effect = maker.dispatch(event);
@@ -237,7 +243,7 @@ mod tests {
         println!("Got error = {:?}", effect.error);
         assert_ne!(None, effect.error);
 
-        let sink = Actor::new(Box::new(Sink {}));
+        let sink = Actor::new(Box::new(Sink));
         let event = Event::new(&maker, Message::Addr(Rc::clone(&sink)));
         let effect = maker.dispatch(event);
 
