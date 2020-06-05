@@ -3,9 +3,14 @@
 //! An [Actor](https://en.wikipedia.org/wiki/Actor_model) runtime for Rust.
 //!
 
-use std::collections::VecDeque;
-use std::rc::Rc;
-use std::cell::RefCell;
+extern crate alloc;
+
+use core::cell::RefCell;
+use alloc::boxed::Box;
+use alloc::rc::Rc;
+//use alloc::rc::Weak;
+use alloc::vec::Vec;
+use alloc::collections::VecDeque;
 
 pub trait Behavior {
     fn react(&self, event: Event) -> Effect;

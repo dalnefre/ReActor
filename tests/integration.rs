@@ -1,5 +1,5 @@
 use reactor::*;
-use std::cell::RefCell;
+use core::cell::RefCell;
 
 struct CallCounter {
     count: RefCell<usize>,
