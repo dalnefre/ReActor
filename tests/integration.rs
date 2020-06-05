@@ -1,5 +1,25 @@
+extern crate alloc;
+
 use reactor::*;
+use alloc::boxed::Box;
+use alloc::rc::Rc;
 use core::cell::RefCell;
+
+#[test]
+#[ignore]
+fn check_struct_sizes() {
+    use core::mem;
+
+    println!("sizeof<Actor> = {:?}", mem::size_of::<Actor>());
+    println!("sizeof<Message> = {:?}", mem::size_of::<Message>());
+    println!("sizeof<Event> = {:?}", mem::size_of::<Event>());
+    println!("sizeof<Effect> = {:?}", mem::size_of::<Effect>());
+    println!("sizeof<Config> = {:?}", mem::size_of::<Config>());
+    println!("sizeof<Rc<Actor>> = {:?}", mem::size_of::<Rc<Actor>>());
+    println!("sizeof<Box<Message>> = {:?}", mem::size_of::<Box<Message>>());
+    println!("sizeof<Box<dyn Behavior>> = {:?}", mem::size_of::<Box<dyn Behavior>>());
+    assert!(false);  // force failure!
+}
 
 struct CallCounter {
     count: RefCell<usize>,
