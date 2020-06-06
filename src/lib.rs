@@ -13,7 +13,7 @@ use alloc::vec::Vec;
 use alloc::collections::VecDeque;
 
 pub trait Behavior {
-    fn react(&self, event: Event) -> Effect;
+    fn react(&self, event: Event) -> Effect;  // FIXME: refactor to Result<Effect, Error>
 }
 
 pub struct Actor {
@@ -158,20 +158,27 @@ impl Config {
     }
 }
 
-#[cfg(test)]
-mod tests {
+pub mod idiom {
     use super::*;
 
-    struct Sink;
+    /// A Sink actor simply throws away all messages that it receives.
+    /// If we make a Request, but don’t care about the Reply, we use a Sink as the Customer.
+    pub struct Sink;
     impl Behavior for Sink {
         fn react(&self, _event: Event) -> Effect {
             Effect::new()
         }
     }
 
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
     #[test]
     fn sink_behavior() {
-        let sink = Actor::new(Box::new(Sink));
+        let sink = Actor::new(Box::new(idiom::Sink));
 
         let event = Event::new(&sink, Message::Empty);
         let effect = sink.dispatch(event);
@@ -188,14 +195,14 @@ mod tests {
         fn react(&self, event: Event) -> Effect {
             let mut effect = Effect::new();
             effect.send(&self.cust, event.message);
-            effect.update(Box::new(Sink {}));
+            effect.update(Box::new(idiom::Sink));
             effect
         }
     }
 
     #[test]
     fn once_behavior() {
-        let sink = Actor::new(Box::new(Sink));
+        let sink = Actor::new(Box::new(idiom::Sink));
         let once = Actor::new(Box::new(Once {
             cust: Rc::clone(&sink)
         }));
@@ -227,7 +234,7 @@ mod tests {
             let mut effect = Effect::new();
             match event.message {
                 Message::Addr(cust) => {
-                    let actor = effect.create(Box::new(Sink));
+                    let actor = effect.create(Box::new(idiom::Sink));
                     effect.send(&cust, Message::Addr(Rc::clone(&actor)));
                 },
                 _ => effect.throw("unknown message"),
@@ -248,7 +255,7 @@ mod tests {
         println!("Got error = {:?}", effect.error);
         assert_ne!(None, effect.error);
 
-        let sink = Actor::new(Box::new(Sink));
+        let sink = Actor::new(Box::new(idiom::Sink));
         let event = Event::new(&maker, Message::Addr(Rc::clone(&sink)));
         let effect = maker.dispatch(event);
 

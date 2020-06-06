@@ -10,6 +10,7 @@ use core::cell::RefCell;
 fn check_struct_sizes() {
     use core::mem;
 
+    println!("sizeof<usize> = {:?}", mem::size_of::<usize>());
     println!("sizeof<Actor> = {:?}", mem::size_of::<Actor>());
     println!("sizeof<Message> = {:?}", mem::size_of::<Message>());
     println!("sizeof<Event> = {:?}", mem::size_of::<Event>());
@@ -18,6 +19,7 @@ fn check_struct_sizes() {
     println!("sizeof<Rc<Actor>> = {:?}", mem::size_of::<Rc<Actor>>());
     println!("sizeof<Box<Message>> = {:?}", mem::size_of::<Box<Message>>());
     println!("sizeof<Box<dyn Behavior>> = {:?}", mem::size_of::<Box<dyn Behavior>>());
+    println!("sizeof<Option<Effect>> = {:?}", mem::size_of::<Option<Effect>>());
     assert!(false);  // force failure!
 }
 
@@ -56,6 +58,29 @@ fn call_counter_behavior() {
     assert_eq!(1, count);
 
     let count = config.dispatch(1);
+    assert_eq!(0, count);
+}
+
+#[test]
+fn sink_ignores_all_messages() {
+    struct Boot;
+    impl Behavior for Boot {
+        fn react(&self, _event: Event) -> Effect {
+            let mut effect = Effect::new();
+
+            let actor = effect.create(Box::new(idiom::Sink));
+            effect.send(&actor, Message::Empty);
+            effect.send(&actor, Message::Empty);
+
+            effect
+        }
+    }
+
+    let mut config = Config::new();
+    let count = config.boot(Box::new(Boot));
+    assert_eq!(2, count);
+
+    let count = config.dispatch(2);
     assert_eq!(0, count);
 }
 
