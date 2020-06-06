@@ -14,7 +14,7 @@ use alloc::vec::Vec;
 use alloc::collections::VecDeque;
 
 pub trait Behavior {
-    fn react(&self, event: Event) -> Effect;  // FIXME: refactor to Result<Effect, Error>
+    fn react(&self, event: Event) -> Result<Effect, Error>;
 }
 
 pub struct Actor {
@@ -27,7 +27,7 @@ impl Actor {
         })
     }
 
-    fn dispatch(&self, event: Event) -> Effect {
+    fn dispatch(&self, event: Event) -> Result<Effect, Error> {
         self.behavior.borrow().react(event)
     }
     fn update(&self, behavior: Box<dyn Behavior>) {
@@ -58,11 +58,12 @@ impl Event {
     }
 }
 
-type Error = &'static str;
+pub type Error = &'static str;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Message {
     Empty,
+    Fail(Error),
     Nat(usize),
     Int(isize),
     Str(&'static str),
@@ -89,7 +90,6 @@ pub struct Effect {
     actors: Vec<Rc<Actor>>,
     events: VecDeque<Event>,
     state: Option<Box<dyn Behavior>>,
-    error: Option<Error>,
 }
 impl Effect {
     pub fn new() -> Self {
@@ -97,7 +97,6 @@ impl Effect {
             actors: Vec::new(),
             events: VecDeque::new(),
             state: None,
-            error: None,
         }
     }
 
@@ -112,9 +111,6 @@ impl Effect {
     }
     pub fn update(&mut self, behavior: Box<dyn Behavior>) {
         self.state = Some(behavior);
-    }
-    pub fn throw(&mut self, reason: Error) {
-        self.error = Some(reason);
     }
 }
 
@@ -148,16 +144,15 @@ impl Config {
         while limit > 0 {
             if let Some(event) = self.events.pop_front() {
                 let target = Rc::clone(&event.target);
-                let mut effect = target.dispatch(event);
-                match effect.error {
-                    None => {
+                match target.dispatch(event) {
+                    Ok(mut effect) => {
                         if let Some(behavior) = effect.state.take() {
                             target.update(behavior);
                         }
                         self.actors.append(&mut effect.actors);  // FIXME: should convert to Weak references here...
                         self.events.append(&mut effect.events);
                     },
-                    Some(reason) => {
+                    Err(reason) => {
                         println!("FAIL! {}", reason);  // FIXME: should deliver a signal to meta-controller
                     },
                 }
@@ -178,8 +173,8 @@ pub mod idiom {
     /// If we make a Request, but don’t care about the Reply, we use a Sink as the Customer.
     pub struct Sink;
     impl Behavior for Sink {
-        fn react(&self, _event: Event) -> Effect {
-            Effect::new()
+        fn react(&self, _event: Event) -> Result<Effect, Error> {
+           Ok(Effect::new())
         }
     }
 
@@ -190,10 +185,10 @@ pub mod idiom {
         pub subject: Rc<Actor>,
     }
     impl Behavior for Forward {
-        fn react(&self, event: Event) -> Effect {
+        fn react(&self, event: Event) -> Result<Effect, Error> {
             let mut effect = Effect::new();
             effect.send(&self.subject, event.message);
-            effect
+            Ok(effect)
         }
     }
 
@@ -207,13 +202,13 @@ pub mod idiom {
         pub label: Message,
     }
     impl Behavior for Label {
-        fn react(&self, event: Event) -> Effect {
+        fn react(&self, event: Event) -> Result<Effect, Error> {
             let mut effect = Effect::new();
             effect.send(&self.cust, Message::Pair(
                 Box::new(self.label.clone()),
                 Box::new(event.message)
             ));
-            effect
+            Ok(effect)
         }
     }
 
@@ -224,13 +219,13 @@ pub mod idiom {
         pub cust: Rc<Actor>,
     }
     impl Behavior for Tag {
-        fn react(&self, event: Event) -> Effect {
+        fn react(&self, event: Event) -> Result<Effect, Error> {
             let mut effect = Effect::new();
             effect.send(&self.cust, Message::Pair(
                 Box::new(Message::Addr(Rc::clone(&event.target))),
                 Box::new(event.message)
             ));
-            effect
+            Ok(effect)
         }
     }
 
@@ -247,22 +242,21 @@ mod tests {
         println!("sink = {:?}", sink);
 
         let event = Event::new(&sink, Message::Empty);
-        let effect = sink.dispatch(event);
+        let effect = sink.dispatch(event).expect("Dispatch failed.");
 
         assert_eq!(0, effect.actors.len());
         assert_eq!(0, effect.events.len());
-        assert_eq!(None, effect.error);
     }
 
     struct Once {
         cust: Rc<Actor>,
     }
     impl Behavior for Once {
-        fn react(&self, event: Event) -> Effect {
+        fn react(&self, event: Event) -> Result<Effect, Error> {
             let mut effect = Effect::new();
             effect.send(&self.cust, event.message);
             effect.update(Box::new(idiom::Sink));
-            effect
+            Ok(effect)
         }
     }
 
@@ -274,38 +268,33 @@ mod tests {
         }));
 
         let event = Event::new(&once, Message::Empty);
-        let effect = once.dispatch(event);
+        let effect = once.dispatch(event).expect("Dispatch failed.");
 
         assert_eq!(0, effect.actors.len());
         assert_eq!(1, effect.events.len());
-        assert_eq!(None, effect.error);
 
-        if let Some(behavior) = effect.state {
-            once.update(behavior);
-        } else {
-            panic!("expected new state!");
-        }
+        let behavior = effect.state.expect("Expected new state.");
+        once.update(behavior);
 
         let event = Event::new(&once, Message::Empty);
-        let effect = once.dispatch(event);
+        let effect = once.dispatch(event).expect("Dispatch failed.");
 
         assert_eq!(0, effect.actors.len());
         assert_eq!(0, effect.events.len());
-        assert_eq!(None, effect.error);
     }
 
     struct Maker;
     impl Behavior for Maker {
-        fn react(&self, event: Event) -> Effect {
+        fn react(&self, event: Event) -> Result<Effect, Error> {
             let mut effect = Effect::new();
             match event.message {
                 Message::Addr(cust) => {
                     let actor = effect.create(Box::new(idiom::Sink));
                     effect.send(&cust, Message::Addr(Rc::clone(&actor)));
+                    Ok(effect)
                 },
-                _ => effect.throw("unknown message"),
+                _ => Err("unknown message"),
             }
-            effect
         }
     }
 
@@ -314,19 +303,14 @@ mod tests {
         let maker = Actor::new(Box::new(Maker));
 
         let event = Event::new(&maker, Message::Empty);
-        let effect = maker.dispatch(event);
-
-        assert_eq!(0, effect.actors.len());
-        assert_eq!(0, effect.events.len());
-        println!("Got error = {:?}", effect.error);
-        assert_ne!(None, effect.error);
+        let reason = maker.dispatch(event).err().expect("Error expected.");
+        println!("Got error = {:?}", reason);
 
         let sink = Actor::new(Box::new(idiom::Sink));
         let event = Event::new(&maker, Message::Addr(Rc::clone(&sink)));
-        let effect = maker.dispatch(event);
+        let effect = maker.dispatch(event).expect("Dispatch failed.");
 
         assert_eq!(1, effect.actors.len());
         assert_eq!(1, effect.events.len());
-        assert_eq!(None, effect.error);
     }
 }

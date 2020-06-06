@@ -1,6 +1,7 @@
 extern crate alloc;
 
 use reactor::*;
+//use reactor::Error;
 use alloc::boxed::Box;
 use alloc::rc::Rc;
 
@@ -14,11 +15,13 @@ fn check_struct_sizes() {
     println!("sizeof<Message> = {:?}", mem::size_of::<Message>());
     println!("sizeof<Event> = {:?}", mem::size_of::<Event>());
     println!("sizeof<Effect> = {:?}", mem::size_of::<Effect>());
+    println!("sizeof<Error> = {:?}", mem::size_of::<Error>());
     println!("sizeof<Config> = {:?}", mem::size_of::<Config>());
     println!("sizeof<Rc<Actor>> = {:?}", mem::size_of::<Rc<Actor>>());
     println!("sizeof<Box<Message>> = {:?}", mem::size_of::<Box<Message>>());
     println!("sizeof<Box<dyn Behavior>> = {:?}", mem::size_of::<Box<dyn Behavior>>());
     println!("sizeof<Option<Effect>> = {:?}", mem::size_of::<Option<Effect>>());
+    println!("sizeof<Result<Effect,Error>> = {:?}", mem::size_of::<Result<Effect,Error>>());
     assert!(false);  // force failure!
 }
 
@@ -26,14 +29,14 @@ fn check_struct_sizes() {
 fn sink_ignores_all_messages() {
     struct Boot;
     impl Behavior for Boot {
-        fn react(&self, _event: Event) -> Effect {
+        fn react(&self, _event: Event) -> Result<Effect, Error> {
             let mut effect = Effect::new();
 
             let sink = effect.create(Box::new(idiom::Sink));
             effect.send(&sink, Message::Empty);
             effect.send(&sink, Message::Empty);
 
-            effect
+            Ok(effect)
         }
     }
 
@@ -49,7 +52,7 @@ fn sink_ignores_all_messages() {
 fn forward_proxies_all_messages() {
     struct Boot;
     impl Behavior for Boot {
-        fn react(&self, _event: Event) -> Effect {
+        fn react(&self, _event: Event) -> Result<Effect, Error> {
             let mut effect = Effect::new();
 
             let sink = effect.create(Box::new(idiom::Sink));
@@ -60,7 +63,7 @@ fn forward_proxies_all_messages() {
             effect.send(&forward, Message::Empty);
             effect.send(&sink, Message::Empty);
 
-            effect
+            Ok(effect)
         }
     }
 
@@ -78,7 +81,7 @@ fn label_decorates_message() {
 
     struct Boot;
     impl Behavior for Boot {
-        fn react(&self, _event: Event) -> Effect {
+        fn react(&self, _event: Event) -> Result<Effect, Error> {
             let mut effect = Effect::new();
 
             let cust = effect.create(Box::new(MockCust));
@@ -88,17 +91,17 @@ fn label_decorates_message() {
             }));
             effect.send(&label, Message::Str("World"));
 
-            effect
+            Ok(effect)
         }
     }
     struct MockCust;
     impl Behavior for MockCust {
-        fn react(&self, event: Event) -> Effect {
+        fn react(&self, event: Event) -> Result<Effect, Error> {
             println!("MockCust: message = {:?}", event.message);
             unsafe {
                 MOCK_MESSAGE = event.message;
             }
-            Effect::new()
+            Ok(Effect::new())
         }
     }
 
@@ -123,7 +126,7 @@ fn tag_decorates_with_self() {
 
     struct Boot;
     impl Behavior for Boot {
-        fn react(&self, _event: Event) -> Effect {
+        fn react(&self, _event: Event) -> Result<Effect, Error> {
             let mut effect = Effect::new();
 
             let cust = effect.create(Box::new(MockCust));
@@ -132,17 +135,17 @@ fn tag_decorates_with_self() {
             }));
             effect.send(&tag, Message::Str("It's Me!"));
 
-            effect
+            Ok(effect)
         }
     }
     struct MockCust;
     impl Behavior for MockCust {
-        fn react(&self, event: Event) -> Effect {
+        fn react(&self, event: Event) -> Result<Effect, Error> {
             println!("MockCust: message = {:?}", event.message);
             unsafe {
                 MOCK_MESSAGE = event.message;
             }
-            Effect::new()
+            Ok(Effect::new())
         }
     }
 
