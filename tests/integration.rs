@@ -68,9 +68,9 @@ fn sink_ignores_all_messages() {
         fn react(&self, _event: Event) -> Effect {
             let mut effect = Effect::new();
 
-            let actor = effect.create(Box::new(idiom::Sink));
-            effect.send(&actor, Message::Empty);
-            effect.send(&actor, Message::Empty);
+            let sink = effect.create(Box::new(idiom::Sink));
+            effect.send(&sink, Message::Empty);
+            effect.send(&sink, Message::Empty);
 
             effect
         }
@@ -82,6 +82,33 @@ fn sink_ignores_all_messages() {
 
     let count = config.dispatch(2);
     assert_eq!(0, count);
+}
+
+#[test]
+fn forward_proxies_all_messages() {
+    struct Boot;
+    impl Behavior for Boot {
+        fn react(&self, _event: Event) -> Effect {
+            let mut effect = Effect::new();
+
+            let sink = effect.create(Box::new(idiom::Sink));
+            let forward = effect.create(Box::new(idiom::Forward {
+                subject: Rc::clone(&sink),
+            }));
+            effect.send(&forward, Message::Empty);
+            effect.send(&forward, Message::Empty);
+            effect.send(&sink, Message::Empty);
+
+            effect
+        }
+    }
+
+    let mut config = Config::new();
+    let count = config.boot(Box::new(Boot));
+    assert_eq!(3, count);
+
+    let count = config.dispatch(3);
+    assert_eq!(2, count);
 }
 
 /*

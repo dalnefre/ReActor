@@ -170,6 +170,19 @@ pub mod idiom {
         }
     }
 
+    /// A Forwarding actor is an Alias or Proxy.
+    /// Messages sent to a forwarding actor are passed on to another actor (the Subject).
+    pub struct Forward {
+        pub subject: Rc<Actor>,
+    }
+    impl Behavior for Forward {
+        fn react(&self, event: Event) -> Effect {
+            let mut effect = Effect::new();
+            effect.send(&self.subject, event.message);
+            effect
+        }
+    }
+
 }
 
 #[cfg(test)]
