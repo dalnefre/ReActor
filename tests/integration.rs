@@ -111,6 +111,44 @@ fn forward_proxies_all_messages() {
     assert_eq!(2, count);
 }
 
+
+#[test]
+fn label_decorates_message() {
+    static mut MOCK_MESSAGE: Message = Message::Empty;
+
+    struct Boot;
+    impl Behavior for Boot {
+        fn react(&self, _event: Event) -> Effect {
+            let mut effect = Effect::new();
+
+            let cust = effect.create(Box::new(MockCust));
+            effect.send(&cust, Message::Str("hello?"));
+
+            effect
+        }
+    }
+    struct MockCust;
+    impl Behavior for MockCust {
+        fn react(&self, event: Event) -> Effect {
+            println!("MockCust: message = {:?}", event.message);
+            unsafe {
+                MOCK_MESSAGE = event.message;
+            }
+            Effect::new()
+        }
+    }
+
+    let mut config = Config::new();
+    let count = config.boot(Box::new(Boot));
+    assert_eq!(1, count);
+
+    let count = config.dispatch(1);
+    assert_eq!(0, count);
+    unsafe {
+        assert_eq!(Message::Str("hello?"), MOCK_MESSAGE);
+    }
+}
+
 /*
 CREATE empty_env WITH \(cust, _).[ SEND ? TO cust ]
 LET env_beh(ident, value, next) = \(cust, req).[

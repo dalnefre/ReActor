@@ -5,6 +5,7 @@
 
 extern crate alloc;
 
+use core::fmt;
 use core::cell::RefCell;
 use alloc::boxed::Box;
 use alloc::rc::Rc;
@@ -33,10 +34,20 @@ impl Actor {
         *self.behavior.borrow_mut() = behavior;
     }
 }
+impl fmt::Debug for Actor {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
+        formatter.write_fmt(format_args!("^{:p}", self))
+    }
+}
+impl PartialEq for Actor {
+    fn eq(&self, other: &Actor) -> bool {
+        self as *const Actor == other as *const Actor
+    }
+}
 
 pub struct Event {
-    target: Rc<Actor>,
-    message: Message,
+    pub target: Rc<Actor>,
+    pub message: Message,
 }
 impl Event {
     fn new(target: &Rc<Actor>, message: Message) -> Self {
@@ -49,6 +60,7 @@ impl Event {
 
 type Error = &'static str;
 
+#[derive(Debug, PartialEq)]
 pub enum Message {
     Empty,
     Nat(usize),
@@ -192,6 +204,8 @@ mod tests {
     #[test]
     fn sink_behavior() {
         let sink = Actor::new(Box::new(idiom::Sink));
+        assert_eq!(sink, sink);
+        println!("sink = {:?}", sink);
 
         let event = Event::new(&sink, Message::Empty);
         let effect = sink.dispatch(event);
