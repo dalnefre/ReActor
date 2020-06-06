@@ -60,7 +60,7 @@ impl Event {
 
 type Error = &'static str;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Message {
     Empty,
     Nat(usize),
@@ -174,6 +174,7 @@ pub mod idiom {
     use super::*;
 
     /// A Sink actor simply throws away all messages that it receives.
+    ///
     /// If we make a Request, but don’t care about the Reply, we use a Sink as the Customer.
     pub struct Sink;
     impl Behavior for Sink {
@@ -182,8 +183,9 @@ pub mod idiom {
         }
     }
 
-    /// A Forwarding actor is an Alias or Proxy.
-    /// Messages sent to a forwarding actor are passed on to another actor (the Subject).
+    /// A Forwarding actor is an Alias or Proxy for another actor.
+    ///
+    /// Messages sent to a forwarding actor are passed on to the Subject.
     pub struct Forward {
         pub subject: Rc<Actor>,
     }
@@ -191,6 +193,43 @@ pub mod idiom {
         fn react(&self, event: Event) -> Effect {
             let mut effect = Effect::new();
             effect.send(&self.subject, event.message);
+            effect
+        }
+    }
+
+    /// A Label is a Forward actor that adds some fixed information to each message.
+    ///
+    /// It acts like a Decorator for messages.
+    /// Sometimes it plays the role of an Adaptor between actors,
+    /// structuring messages to meet the expectations of the subject.
+    pub struct Label {
+        pub cust: Rc<Actor>,
+        pub label: Message,
+    }
+    impl Behavior for Label {
+        fn react(&self, event: Event) -> Effect {
+            let mut effect = Effect::new();
+            effect.send(&self.cust, Message::Pair(
+                Box::new(self.label.clone()),
+                Box::new(event.message)
+            ));
+            effect
+        }
+    }
+
+    /// A Tag labels each message with a reference to itself.
+    ///
+    /// A Tag actor is often used as a Customer for a Request when we want to identify a specific Reply.
+    pub struct Tag {
+        pub cust: Rc<Actor>,
+    }
+    impl Behavior for Tag {
+        fn react(&self, event: Event) -> Effect {
+            let mut effect = Effect::new();
+            effect.send(&self.cust, Message::Pair(
+                Box::new(Message::Addr(Rc::clone(&event.target))),
+                Box::new(event.message)
+            ));
             effect
         }
     }

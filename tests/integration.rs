@@ -111,7 +111,6 @@ fn forward_proxies_all_messages() {
     assert_eq!(2, count);
 }
 
-
 #[test]
 fn label_decorates_message() {
     static mut MOCK_MESSAGE: Message = Message::Empty;
@@ -122,7 +121,11 @@ fn label_decorates_message() {
             let mut effect = Effect::new();
 
             let cust = effect.create(Box::new(MockCust));
-            effect.send(&cust, Message::Str("hello?"));
+            let label = effect.create(Box::new(idiom::Label {
+                cust: Rc::clone(&cust),
+                label: Message::Str("Hello"),
+            }));
+            effect.send(&label, Message::Str("World"));
 
             effect
         }
@@ -142,10 +145,64 @@ fn label_decorates_message() {
     let count = config.boot(Box::new(Boot));
     assert_eq!(1, count);
 
-    let count = config.dispatch(1);
+    let count = config.dispatch(2);
+    assert_eq!(0, count);
+    let expect = Message::Pair(
+        Box::new(Message::Str("Hello")),
+        Box::new(Message::Str("World")),
+    );
+    unsafe {
+        assert_eq!(expect, MOCK_MESSAGE);
+    }
+}
+
+#[test]
+fn tag_decorates_with_self() {
+    static mut MOCK_MESSAGE: Message = Message::Empty;
+
+    struct Boot;
+    impl Behavior for Boot {
+        fn react(&self, _event: Event) -> Effect {
+            let mut effect = Effect::new();
+
+            let cust = effect.create(Box::new(MockCust));
+            let tag = effect.create(Box::new(idiom::Tag {
+                cust: Rc::clone(&cust),
+            }));
+            effect.send(&tag, Message::Str("It's Me!"));
+
+            effect
+        }
+    }
+    struct MockCust;
+    impl Behavior for MockCust {
+        fn react(&self, event: Event) -> Effect {
+            println!("MockCust: message = {:?}", event.message);
+            unsafe {
+                MOCK_MESSAGE = event.message;
+            }
+            Effect::new()
+        }
+    }
+
+    let mut config = Config::new();
+    let count = config.boot(Box::new(Boot));
+    assert_eq!(1, count);
+
+    let count = config.dispatch(2);
     assert_eq!(0, count);
     unsafe {
-        assert_eq!(Message::Str("hello?"), MOCK_MESSAGE);
+        match &MOCK_MESSAGE {
+            Message::Pair(a, b) => {
+                match **a {
+                    Message::Addr(_) => {
+                        assert_eq!(Message::Str("It's Me!"), **b);
+                    },
+                    _ => panic!("Expected Addr(_), Got {:?}", a),
+                }
+            },
+            m => panic!("Unexpected {:?}", m)
+        }
     }
 }
 
