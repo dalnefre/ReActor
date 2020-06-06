@@ -9,7 +9,7 @@ use core::fmt;
 use core::cell::RefCell;
 use alloc::boxed::Box;
 use alloc::rc::Rc;
-//use alloc::rc::Weak;
+use alloc::rc::Weak;
 use alloc::vec::Vec;
 use alloc::collections::VecDeque;
 
@@ -88,14 +88,14 @@ pub enum Message {
 
 pub struct Effect {
     actors: Vec<Rc<Actor>>,
-    events: VecDeque<Event>,
+    events: Vec<Event>,
     state: Option<Box<dyn Behavior>>,
 }
 impl Effect {
     pub fn new() -> Self {
         Self {
             actors: Vec::new(),
-            events: VecDeque::new(),
+            events: Vec::new(),
             state: None,
         }
     }
@@ -107,7 +107,7 @@ impl Effect {
     }
     pub fn send(&mut self, target: &Rc<Actor>, message: Message) {
         let event = Event::new(target, message);
-        self.events.push_back(event);
+        self.events.push(event);
     }
     pub fn update(&mut self, behavior: Box<dyn Behavior>) {
         self.state = Some(behavior);
@@ -115,7 +115,7 @@ impl Effect {
 }
 
 pub struct Config {
-    actors: Vec<Rc<Actor>>,
+    actors: Vec<Weak<Actor>>,
     events: VecDeque<Event>,
 }
 impl Config {
@@ -131,7 +131,7 @@ impl Config {
     /// Returns the number of events enqueued.
     pub fn boot(&mut self, behavior: Box<dyn Behavior>) -> usize {
         let actor = Actor::new(behavior);
-        self.actors.push(Rc::clone(&actor));  // FIXME: do we need to retain the bootstrap actor?
+        self.actors.push(Rc::downgrade(&actor));  // FIXME: do we need to retain the bootstrap actor?
         let event = Event::new(&actor, Message::Empty);
         self.events.push_back(event);
         self.dispatch(1)  // dispatch bootstrap message
@@ -149,8 +149,12 @@ impl Config {
                         if let Some(behavior) = effect.state.take() {
                             target.update(behavior);
                         }
-                        self.actors.append(&mut effect.actors);  // FIXME: should convert to Weak references here...
-                        self.events.append(&mut effect.events);
+                        while let Some(actor) = effect.actors.pop() {
+                            self.actors.push(Rc::downgrade(&actor));
+                        }
+                        while let Some(event) = effect.events.pop() {
+                            self.events.push_back(event);
+                        }
                     },
                     Err(reason) => {
                         println!("FAIL! {}", reason);  // FIXME: should deliver a signal to meta-controller
