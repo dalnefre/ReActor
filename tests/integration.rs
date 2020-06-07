@@ -171,22 +171,18 @@ fn tag_decorates_with_self() {
 }
 
 /*
-CREATE empty_env WITH \(cust, _).[ SEND ? TO cust ]
-LET env_beh(ident, value, next) = \(cust, req).[
-  CASE req OF
-  (#lookup, $ident) : [ SEND value TO cust ]
-  _ : [ SEND (cust, req) TO next ]
-  END
+LET sink_beh = \_.[]
+CREATE sink WITH sink_beh
+
+LET forward_beh = \cust.\msg.[
+    SEND msg TO cust
 ]
-LET mutable_env_beh(next) = \(cust, req).[
-  CASE req OF
-  (#bind, ident, value) : [
-    CREATE next' WITH env_beh(ident, value, next)
-    BECOME mutable_env_beh(next')
-    SEND SELF TO cust
-  ]
-  _ : [ SEND (cust, req) TO next ]
-  END
+
+LET label_beh(cust, label) = \msg.[ SEND (label, msg) TO cust ]
+
+LET once_beh(cust) = \msg.[
+    SEND msg TO cust
+    BECOME sink_beh
 ]
 
 LET race_beh(list) = \(cust, req).[
@@ -222,4 +218,23 @@ LET fork_beh(cust, head, tail) = \(h_req, t_req).[
   SEND (k_tail, t_req) TO tail
   BECOME join_beh(cust, k_head, k_tail)
 ]
+
+CREATE empty_env WITH \(cust, _).[ SEND ? TO cust ]
+LET env_beh(ident, value, next) = \(cust, req).[
+  CASE req OF
+  (#lookup, $ident) : [ SEND value TO cust ]
+  _ : [ SEND (cust, req) TO next ]
+  END
+]
+LET mutable_env_beh(next) = \(cust, req).[
+  CASE req OF
+  (#bind, ident, value) : [
+    CREATE next' WITH env_beh(ident, value, next)
+    BECOME mutable_env_beh(next')
+    SEND SELF TO cust
+  ]
+  _ : [ SEND (cust, req) TO next ]
+  END
+]
+
 */

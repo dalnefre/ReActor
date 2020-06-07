@@ -175,6 +175,12 @@ pub mod idiom {
     /// A Sink actor simply throws away all messages that it receives.
     ///
     /// If we make a Request, but don’t care about the Reply, we use a Sink as the Customer.
+    ///
+    /// # Humus
+    /// ```Humus
+    /// LET sink_beh = \_.[]
+    /// CREATE sink WITH sink_beh
+    /// ```
     pub struct Sink;
     impl Behavior for Sink {
         fn react(&self, _event: Event) -> Result<Effect, Error> {
@@ -185,6 +191,13 @@ pub mod idiom {
     /// A Forwarding actor is an Alias or Proxy for another actor.
     ///
     /// Messages sent to a forwarding actor are passed on to the Subject.
+    ///
+    /// # Humus
+    /// ```Humus
+    /// LET forward_beh = \cust.\msg.[
+    ///     SEND msg TO cust
+    /// ]
+    /// ```
     pub struct Forward {
         pub subject: Rc<Actor>,
     }
@@ -201,6 +214,13 @@ pub mod idiom {
     /// It acts like a Decorator for messages.
     /// Sometimes it plays the role of an Adaptor between actors,
     /// structuring messages to meet the expectations of the subject.
+    ///
+    /// # Humus
+    /// ```Humus
+    /// LET label_beh(cust, label) = \msg.[
+    ///     SEND (label, msg) TO cust
+    /// ]
+    /// ```
     pub struct Label {
         pub cust: Rc<Actor>,
         pub label: Message,
@@ -219,6 +239,13 @@ pub mod idiom {
     /// A Tag labels each message with a reference to itself.
     ///
     /// A Tag actor is often used as a Customer for a Request when we want to identify a specific Reply.
+    ///
+    /// # Humus
+    /// ```Humus
+    /// LET tag_beh(cust) = \msg.[
+    ///     SEND (SELF, msg) TO cust
+    /// ]
+    /// ```
     pub struct Tag {
         pub cust: Rc<Actor>,
     }
