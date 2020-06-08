@@ -3,6 +3,8 @@
 //! An [Actor](https://en.wikipedia.org/wiki/Actor_model) runtime for Rust.
 //!
 
+//#![no_std]  <-- FIXME: need std for println
+
 extern crate alloc;
 
 use core::fmt;
@@ -187,6 +189,11 @@ pub mod idiom {
            Ok(Effect::new())
         }
     }
+    impl Sink {
+        pub fn new() -> Box<dyn Behavior> {
+            Box::new(Sink)
+        }
+    }
 
     /// A Forwarding actor is an Alias or Proxy for another actor.
     ///
@@ -206,6 +213,13 @@ pub mod idiom {
             let mut effect = Effect::new();
             effect.send(&self.subject, event.message);
             Ok(effect)
+        }
+    }
+    impl Forward {
+        pub fn new(subject: &Rc<Actor>) -> Box<dyn Behavior> {
+            Box::new(Forward {
+                subject: Rc::clone(&subject),
+            })
         }
     }
 
@@ -235,6 +249,14 @@ pub mod idiom {
             Ok(effect)
         }
     }
+    impl Label {
+        pub fn new(cust: &Rc<Actor>, label: Message) -> Box<dyn Behavior> {
+            Box::new(Label {
+                cust: Rc::clone(&cust),
+                label: label,
+            })
+        }
+    }
 
     /// A Tag labels each message with a reference to itself.
     ///
@@ -257,6 +279,13 @@ pub mod idiom {
                 Box::new(event.message)
             ));
             Ok(effect)
+        }
+    }
+    impl Tag {
+        pub fn new(cust: &Rc<Actor>) -> Box<dyn Behavior> {
+            Box::new(Tag {
+                cust: Rc::clone(&cust),
+            })
         }
     }
 

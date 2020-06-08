@@ -55,10 +55,8 @@ fn forward_proxies_all_messages() {
         fn react(&self, _event: Event) -> Result<Effect, Error> {
             let mut effect = Effect::new();
 
-            let sink = effect.create(Box::new(idiom::Sink));
-            let forward = effect.create(Box::new(idiom::Forward {
-                subject: Rc::clone(&sink),
-            }));
+            let sink = effect.create(idiom::Sink::new());
+            let forward = effect.create(idiom::Forward::new(&sink));
             effect.send(&forward, Message::Empty);
             effect.send(&forward, Message::Empty);
             effect.send(&sink, Message::Empty);
@@ -85,10 +83,7 @@ fn label_decorates_message() {
             let mut effect = Effect::new();
 
             let cust = effect.create(Box::new(MockCust));
-            let label = effect.create(Box::new(idiom::Label {
-                cust: Rc::clone(&cust),
-                label: Message::Str("Hello"),
-            }));
+            let label = effect.create(idiom::Label::new(&cust, Message::Str("Hello")));
             effect.send(&label, Message::Str("World"));
 
             Ok(effect)
@@ -130,9 +125,7 @@ fn tag_decorates_with_self() {
             let mut effect = Effect::new();
 
             let cust = effect.create(Box::new(MockCust));
-            let tag = effect.create(Box::new(idiom::Tag {
-                cust: Rc::clone(&cust),
-            }));
+            let tag = effect.create(idiom::Tag::new(&cust));
             effect.send(&tag, Message::Str("It's Me!"));
 
             Ok(effect)
