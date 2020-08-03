@@ -71,8 +71,8 @@ pub enum Message {
 //    Num(Number),
     Sym(&'static str),
     Str(String),
-    Array(Vec<Message>),
-//    Object(Map<String, Box<Message>>),
+    List(Vec<Message>),
+//    Struct(Map<String, Box<Message>>),
     Pair(Box<Message>, Box<Message>),
     Addr(Rc<Actor>),
 }
