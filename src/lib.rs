@@ -9,6 +9,7 @@ extern crate alloc;
 
 use core::fmt;
 use core::cell::RefCell;
+//use core::iter::Map;
 use alloc::boxed::Box;
 use alloc::rc::Rc;
 use alloc::rc::Weak;
@@ -65,40 +66,38 @@ pub type Error = &'static str;
 #[derive(Debug, PartialEq, Clone)]
 pub enum Message {
     Empty,
-    Fail(Error),
     Nat(usize),
     Int(isize),
-    Str(&'static str),
-    Addr(Rc<Actor>),
-    Maybe(Option<Box<Message>>),
+//    Num(Number),
+    Sym(&'static str),
+    Str(String),
+    Array(Vec<Message>),
+//    Object(Map<String, Box<Message>>),
     Pair(Box<Message>, Box<Message>),
-    List(&'static [Box<Message>]),
-    OkFail {
-        ok: Rc<Actor>,
-        fail: Rc<Actor>,
-    },
-    GetMsg {
-        cust: Rc<Actor>,
-        name: &'static str,
-    },
-    SetMsg {
-        cust: Rc<Actor>,
-        name: &'static str,
-        value: Box<Message>,
-    },
+    Addr(Rc<Actor>),
 }
+/*
+enum Value {  // from serde_json::Value
+    Null,
+    Bool(bool),
+    Number(Number),
+    String(String),
+    Array(Vec<Value>),
+    Object(Map<String, Value>),
+}
+*/
 
 pub struct Effect {
     actors: Vec<Rc<Actor>>,
     events: Vec<Event>,
-    state: Option<Box<dyn Behavior>>,
+    update: Option<Box<dyn Behavior>>,
 }
 impl Effect {
     pub fn new() -> Self {
         Self {
             actors: Vec::new(),
             events: Vec::new(),
-            state: None,
+            update: None,
         }
     }
 
@@ -112,7 +111,7 @@ impl Effect {
         self.events.push(event);
     }
     pub fn update(&mut self, behavior: Box<dyn Behavior>) {
-        self.state = Some(behavior);
+        self.update = Some(behavior);
     }
 }
 
@@ -148,7 +147,7 @@ impl Config {
                 let target = Rc::clone(&event.target);
                 match target.dispatch(event) {
                     Ok(mut effect) => {
-                        if let Some(behavior) = effect.state.take() {
+                        if let Some(behavior) = effect.update.take() {
                             target.update(behavior);
                         }
                         while let Some(actor) = effect.actors.pop() {
@@ -333,7 +332,7 @@ mod tests {
         assert_eq!(0, effect.actors.len());
         assert_eq!(1, effect.events.len());
 
-        let behavior = effect.state.expect("Expected new state.");
+        let behavior = effect.update.expect("Expected update.");
         once.update(behavior);
 
         let event = Event::new(&once, Message::Empty);

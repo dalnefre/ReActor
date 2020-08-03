@@ -83,8 +83,8 @@ fn label_decorates_message() {
             let mut effect = Effect::new();
 
             let cust = effect.create(Box::new(MockCust));
-            let label = effect.create(idiom::Label::new(&cust, Message::Str("Hello")));
-            effect.send(&label, Message::Str("World"));
+            let label = effect.create(idiom::Label::new(&cust, Message::Sym("Hello")));
+            effect.send(&label, Message::Sym("World"));
 
             Ok(effect)
         }
@@ -107,8 +107,8 @@ fn label_decorates_message() {
     let count = config.dispatch(2);
     assert_eq!(0, count);
     let expect = Message::Pair(
-        Box::new(Message::Str("Hello")),
-        Box::new(Message::Str("World")),
+        Box::new(Message::Sym("Hello")),
+        Box::new(Message::Sym("World")),
     );
     unsafe {
         assert_eq!(expect, MOCK_MESSAGE);
@@ -126,7 +126,7 @@ fn tag_decorates_with_self() {
 
             let cust = effect.create(Box::new(MockCust));
             let tag = effect.create(idiom::Tag::new(&cust));
-            effect.send(&tag, Message::Str("It's Me!"));
+            effect.send(&tag, Message::Sym("It's Me!"));
 
             Ok(effect)
         }
@@ -153,7 +153,7 @@ fn tag_decorates_with_self() {
             Message::Pair(a, b) => {
                 match **a {
                     Message::Addr(_) => {
-                        assert_eq!(Message::Str("It's Me!"), **b);
+                        assert_eq!(Message::Sym("It's Me!"), **b);
                     },
                     _ => panic!("Expected Addr(_), Got {:?}", a),
                 }
@@ -195,39 +195,39 @@ LET send_to_all(msg, list) = [
 
 LET tag_beh(cust) = \msg.[ SEND (SELF, msg) TO cust ]
 LET join_beh(cust, k_first, k_rest) = \msg.[
-  CASE msg OF
-  ($k_first, first) : [
-    BECOME \($k_rest, rest).[ SEND (first, rest) TO cust ]
-  ]
-  ($k_rest, rest) : [
-    BECOME \($k_first, first).[ SEND (first, rest) TO cust ]
-  ]
-  END
+    CASE msg OF
+    ($k_first, first) : [
+        BECOME \($k_rest, rest).[ SEND (first, rest) TO cust ]
+    ]
+    ($k_rest, rest) : [
+        BECOME \($k_first, first).[ SEND (first, rest) TO cust ]
+    ]
+    END
 ]
 LET fork_beh(cust, head, tail) = \(h_req, t_req).[
-  CREATE k_head WITH tag_beh(SELF)
-  CREATE k_tail WITH tag_beh(SELF)
-  SEND (k_head, h_req) TO head
-  SEND (k_tail, t_req) TO tail
-  BECOME join_beh(cust, k_head, k_tail)
+    CREATE k_head WITH tag_beh(SELF)
+    CREATE k_tail WITH tag_beh(SELF)
+    SEND (k_head, h_req) TO head
+    SEND (k_tail, t_req) TO tail
+    BECOME join_beh(cust, k_head, k_tail)
 ]
 
 CREATE empty_env WITH \(cust, _).[ SEND ? TO cust ]
 LET env_beh(ident, value, next) = \(cust, req).[
-  CASE req OF
-  (#lookup, $ident) : [ SEND value TO cust ]
-  _ : [ SEND (cust, req) TO next ]
-  END
+    CASE req OF
+    (#lookup, $ident) : [ SEND value TO cust ]
+    _ : [ SEND (cust, req) TO next ]
+    END
 ]
 LET mutable_env_beh(next) = \(cust, req).[
-  CASE req OF
-  (#bind, ident, value) : [
-    CREATE next' WITH env_beh(ident, value, next)
-    BECOME mutable_env_beh(next')
-    SEND SELF TO cust
-  ]
-  _ : [ SEND (cust, req) TO next ]
-  END
+    CASE req OF
+    (#bind, ident, value) : [
+        CREATE next' WITH env_beh(ident, value, next)
+        BECOME mutable_env_beh(next')
+        SEND SELF TO cust
+    ]
+    _ : [ SEND (cust, req) TO next ]
+    END
 ]
 
 */
