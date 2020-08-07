@@ -110,8 +110,14 @@ impl Effect {
         let event = Event::new(target, message);
         self.events.push(event);
     }
-    pub fn update(&mut self, behavior: Box<dyn Behavior>) {
-        self.update = Some(behavior);
+    pub fn update(&mut self, behavior: Box<dyn Behavior>) -> Result<(), Error> {
+        match self.update {
+            Some(_) => Err("Attempted to update the behavior of an actor more than once"),
+            None => {
+                self.update = Some(behavior);
+                Ok(())
+            }
+        }
     }
 }
 
@@ -314,7 +320,7 @@ mod tests {
         fn react(&self, event: Event) -> Result<Effect, Error> {
             let mut effect = Effect::new();
             effect.send(&self.cust, event.message);
-            effect.update(Box::new(idiom::Sink));
+            effect.update(Box::new(idiom::Sink))?;
             Ok(effect)
         }
     }
