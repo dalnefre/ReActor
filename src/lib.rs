@@ -9,7 +9,6 @@ extern crate alloc;
 
 use core::fmt;
 use core::cell::RefCell;
-//use core::iter::Map;
 use alloc::boxed::Box;
 use alloc::rc::Rc;
 use alloc::rc::Weak;
@@ -64,6 +63,20 @@ impl Event {
 pub type Error = &'static str;
 
 #[derive(Debug, PartialEq, Clone)]
+pub struct Cons<T> {
+    left: Box<T>,
+    right: Box<T>,
+}
+impl<T> Cons<T> {
+    fn new(left: T, right: T) -> Self {
+        Cons {
+            left: Box::new(left),
+            right: Box::new(right),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
 pub enum Message {
     Empty,
     Nat(usize),
@@ -74,7 +87,8 @@ pub enum Message {
     List(Vec<Message>),
 //    Struct(Map<String, Box<Message>>),
 //    Struct(Map<String, Message>),  // FIXME: serdes uses their own Map, maybe we need one too?
-    Pair(Box<Message>, Box<Message>),  // FIXME: implement our own Pair to provide indirection(s)
+    Pair(Box<Message>, Box<Message>),  // FIXME: implement our own Pair to provide indirection(s)? ...but it's noisier!
+    Pr(Cons<Message>),
     Addr(Rc<Actor>),
 }
 /*
@@ -248,10 +262,16 @@ pub mod idiom {
     impl Behavior for Label {
         fn react(&self, event: Event) -> Result<Effect, Error> {
             let mut effect = Effect::new();
+/*
             effect.send(&self.cust, Message::Pair(
                 Box::new(self.label.clone()),
                 Box::new(event.message)
             ));
+*/
+            effect.send(&self.cust, Message::Pr(Cons::new(
+                self.label.clone(),
+                event.message
+            )));
             Ok(effect)
         }
     }
