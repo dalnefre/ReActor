@@ -68,12 +68,13 @@ pub enum Message {
     Empty,
     Nat(usize),
     Int(isize),
-//    Num(Number),
+//    Num(int, base, exp),  // num = (int * base) ^ exp
     Sym(&'static str),
     Str(String),
     List(Vec<Message>),
 //    Struct(Map<String, Box<Message>>),
-    Pair(Box<Message>, Box<Message>),
+//    Struct(Map<String, Message>),  // FIXME: serdes uses their own Map, maybe we need one too?
+    Pair(Box<Message>, Box<Message>),  // FIXME: implement our own Pair to provide indirection(s)
     Addr(Rc<Actor>),
 }
 /*

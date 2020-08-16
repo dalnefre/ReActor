@@ -150,6 +150,9 @@ fn tag_decorates_with_self() {
     assert_eq!(0, count);
     unsafe {
         match &MOCK_MESSAGE {
+/*
+            Message::Pair(box Message::Addr(_), box Message::Sym("It's Me!")) => {  // FIXME: experimental -- requires nightly
+*/
             Message::Pair(a, b) => {
                 match **a {
                     Message::Addr(_) => {
@@ -176,6 +179,10 @@ LET label_beh(cust, label) = \msg.[ SEND (label, msg) TO cust ]
 LET once_beh(cust) = \msg.[
     SEND msg TO cust
     BECOME sink_beh
+]
+
+LET counter_beh(count) = \n.[
+    BECOME counter_beh(add(count, n))
 ]
 
 LET race_beh(list) = \(cust, req).[
