@@ -14,6 +14,7 @@ use alloc::rc::Rc;
 use alloc::rc::Weak;
 use alloc::vec::Vec;
 use alloc::collections::VecDeque;
+use alloc::collections::BTreeMap;
 
 pub trait Behavior {
     fn react(&self, event: Event) -> Result<Effect, Error>;
@@ -67,25 +68,14 @@ pub enum Message {
     Empty,
     Nat(usize),
     Int(isize),
-//    Num(int, base, exp),  // num = (int * base) ^ exp
+    Num(isize, isize, isize),  // num = int * base ^ exp
     Sym(&'static str),
     Str(String),
     List(Vec<Message>),
-//    Struct(Map<String, Box<Message>>),
-//    Struct(Map<String, Message>),  // FIXME: serdes uses their own Map, maybe we need one too?
+    Struct(BTreeMap<String, Message>),
     Pair(Box<Message>, Box<Message>),
     Addr(Rc<Actor>),
 }
-/*
-enum Value {  // from serde_json::Value
-    Null,
-    Bool(bool),
-    Number(Number),
-    String(String),
-    Array(Vec<Value>),
-    Object(Map<String, Value>),
-}
-*/
 
 pub struct Effect {
     actors: Vec<Rc<Actor>>,

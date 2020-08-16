@@ -6,7 +6,7 @@ use alloc::boxed::Box;
 use alloc::rc::Rc;
 
 #[test]
-#[ignore]
+//#[ignore]
 fn check_struct_sizes() {
     use core::mem;
 
