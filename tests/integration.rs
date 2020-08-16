@@ -4,9 +4,10 @@ use reactor::*;
 //use reactor::Error;
 use alloc::boxed::Box;
 use alloc::rc::Rc;
+use alloc::collections::BTreeMap;
 
 #[test]
-//#[ignore]
+#[ignore]
 fn check_struct_sizes() {
     use core::mem;
 
@@ -164,6 +165,86 @@ fn tag_decorates_with_self() {
             m => panic!("Unexpected {:?}", m)
         }
     }
+}
+
+#[test]
+fn can_send_struct_and_num() {
+//  example: (7/5) / (2/3) = (7/5) * (3/2) = (21/10) = (21 * 10 ^ -1)
+    struct Boot;
+    impl Behavior for Boot {
+        fn react(&self, _event: Event) -> Result<Effect, Error> {
+            let mut effect = Effect::new();
+
+            let calc = effect.create(Box::new(RationalDiv));
+            let check = effect.create(AssertAnswer::new(Message::Num(21, 10, -1)));
+            let mut m = BTreeMap::new();
+            m.insert(String::from("k"), Message::Addr(Rc::clone(&check)));
+            m.insert(String::from("n"), Message::Num(7, 5, -1));
+            m.insert(String::from("d"), Message::Num(2, 3, -1));
+            effect.send(&calc, Message::Struct(m));
+
+            Ok(effect)
+        }
+    }
+
+    fn rat_div(n: &Message, d: &Message) -> Message {
+        match (n, d) {
+            (Message::Num(ni, nb, -1), Message::Num(di, db, -1)) => {
+                Message::Num(ni * db, nb * di, -1)
+            },
+            _ => Message::Empty,  // default/failure value
+        }
+    }
+
+    struct RationalDiv;
+    impl Behavior for RationalDiv {
+        fn react(&self, event: Event) -> Result<Effect, Error> {
+            let mut effect = Effect::new();
+
+            match event.message {
+                Message::Struct(m) => {
+                    println!("RationalDiv: m = {:?}", m);
+                    let n = m.get(&String::from("n")).unwrap();  // FIXME: we want Error instead of panic!
+                    let d = m.get(&String::from("d")).unwrap();  // FIXME: we want Error instead of panic!
+                    match m.get(&String::from("k")) {
+                        Some(Message::Addr(cust)) => {
+                            let answer = rat_div(n, d);
+                            effect.send(&cust, answer);
+                            Ok(effect)
+                        },
+                        _ => Err("Some(Addr(_)) required!"),
+                    }
+                },
+                _ => Err("Message not understood"),  // FIXME: need mechanism for runtime to report Errors...
+            }
+
+        }
+    }
+
+    struct AssertAnswer {
+        expect: Message,
+    };
+    impl Behavior for AssertAnswer {
+        fn react(&self, event: Event) -> Result<Effect, Error> {
+            println!("AssertAnswer: message = {:?}", event.message);
+            assert_eq!(self.expect, event.message);
+            Ok(Effect::new())
+        }
+    }
+    impl AssertAnswer {
+        pub fn new(msg: Message) -> Box<dyn Behavior> {
+            Box::new(AssertAnswer {
+                expect: msg,
+            })
+        }
+    }
+
+    let mut config = Config::new();
+    let count = config.boot(Box::new(Boot));
+    assert_eq!(1, count);
+
+    let count = config.dispatch(2);
+    assert_eq!(0, count);
 }
 
 /*
