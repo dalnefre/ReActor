@@ -14,7 +14,7 @@ use alloc::rc::Rc;
 use alloc::rc::Weak;
 use alloc::vec::Vec;
 use alloc::collections::VecDeque;
-use alloc::collections::BTreeMap;
+//use alloc::collections::BTreeMap;
 
 pub trait Behavior {
     fn react(&self, event: Event) -> Result<Effect, Error>;
@@ -70,9 +70,8 @@ pub enum Message {
     Int(isize),
     Num(isize, isize, isize),  // num = int * base ^ exp
     Sym(&'static str),
-    Str(String),
-    List(Vec<Message>),
-    Struct(BTreeMap<String, Message>),
+//    List(&'static [Message]),
+//    Struct(BTreeMap<String, Message>),
     Pair(Box<Message>, Box<Message>),
     Addr(Rc<Actor>),
 }
