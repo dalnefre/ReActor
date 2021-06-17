@@ -53,8 +53,8 @@ pub struct Event {
     pub message: Message,
 }
 impl Event {
-    fn new(target: &Rc<Actor>, message: Message) -> Self {
-        Self {
+    fn new(target: &Rc<Actor>, message: Message) -> Event {
+        Event {
             target: Rc::clone(target),
             message: message
         }
@@ -82,8 +82,8 @@ pub struct Effect {
     update: Option<Box<dyn Behavior>>,
 }
 impl Effect {
-    pub fn new() -> Self {
-        Self {
+    pub fn new() -> Effect {
+        Effect {
             actors: Vec::new(),
             events: Vec::new(),
             update: None,
@@ -115,8 +115,8 @@ pub struct Config {
     events: VecDeque<Event>,
 }
 impl Config {
-    pub fn new() -> Self {
-        Self {
+    pub fn new() -> Config {
+        Config {
             actors: Vec::new(),
             events: VecDeque::new(),
         }
@@ -127,7 +127,7 @@ impl Config {
     /// Returns the number of events enqueued.
     pub fn boot(&mut self, behavior: Box<dyn Behavior>) -> usize {
         let actor = Actor::new(behavior);
-        self.actors.push(Rc::downgrade(&actor));  // FIXME: do we need to retain the bootstrap actor?
+        self.actors.push(Rc::downgrade(&actor));
         let event = Event::new(&actor, Message::Empty);
         self.events.push_back(event);
         self.dispatch(1)  // dispatch bootstrap message
@@ -142,14 +142,14 @@ impl Config {
                 let target = Rc::clone(&event.target);
                 match target.dispatch(event) {
                     Ok(mut effect) => {
-                        if let Some(behavior) = effect.update.take() {
-                            target.update(behavior);
-                        }
                         while let Some(actor) = effect.actors.pop() {
                             self.actors.push(Rc::downgrade(&actor));
                         }
                         while let Some(event) = effect.events.pop() {
                             self.events.push_back(event);
+                        }
+                        if let Some(behavior) = effect.update.take() {
+                            target.update(behavior);
                         }
                     },
                     Err(reason) => {
